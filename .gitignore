@@ -1,0 +1,108 @@
+# ============================================================
+# Python / Backend
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+env/
+ENV/
+
+# ============================================================
+# Node.js / Frontend
+# ============================================================
+node_modules/
+.next/
+out/
+.turbo/
+.cache/
+*.tsbuildinfo
+.npm/
+.yarn/
+.pnpm-store/
+.parcel-cache/
+
+# ============================================================
+# Environment variables / secrets
+# ============================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.crt
+secrets.json
+credentials.json
+
+# ============================================================
+# Docker / DB volumes
+# ============================================================
+postgres_data/
+*.sql.bak
+*.dump
+
+# ============================================================
+# IDE / Editor
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================================
+# Claude Code working dirs
+# ============================================================
+.claude/worktrees/
+.claude/settings.local.json
+
+# ============================================================
+# OS temp / ephemeral
+# ============================================================
+tmp/
+temp/
+.tmp/
+
+# ============================================================
+# Project-specific scratch files
+# ============================================================
+meeting.md
+dsm_*.ps1
+dsm_*.log
+dsm_*.txt
+cf_service.txt

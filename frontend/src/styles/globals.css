@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  /* ── DARK MODE (default) */
+  body {
+    @apply bg-onyx-950 text-onyx-100 font-body;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(251,191,36,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(251,191,36,0.04) 0%, transparent 50%);
+    min-height: 100vh;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+@layer components {
+  .btn-gold {
+    @apply px-5 py-2.5 bg-gold-500 text-onyx-950 font-body font-semibold rounded-lg
+           hover:bg-gold-400 active:bg-gold-600 transition-all duration-150
+           disabled:opacity-40 disabled:cursor-not-allowed text-sm;
+  }
+  .btn-outline {
+    @apply px-5 py-2.5 border border-onyx-600 text-onyx-200 font-body font-medium rounded-lg
+           hover:border-gold-500 hover:text-gold-400 transition-all duration-150 text-sm;
+  }
+  .card {
+    @apply bg-onyx-900 border border-onyx-800 rounded-xl p-5;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-medium;
+  }
+  .input {
+    @apply w-full bg-onyx-800 border border-onyx-700 rounded-lg px-3 py-2.5 text-sm
+           text-onyx-100 placeholder-onyx-500
+           focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500/30
+           transition-all duration-150;
+  }
+  .label { @apply block text-xs font-mono text-onyx-400 mb-1.5 uppercase tracking-wider; }
+  .section-title { @apply font-display text-2xl font-semibold text-white; }
+  .table-row { @apply border-b border-onyx-800 hover:bg-onyx-800/50 transition-colors; }
+}
+
+/* ════════════════════════════════════════════════
+   LIGHT MODE OVERRIDES  (flattened — no nesting)
+   Applied when <html> does NOT have class "dark"
+   ════════════════════════════════════════════════ */
+
+/* Body */
+html:not(.dark) body {
+  background: #f4f5f7 !important;
+  background-image: none !important;
+  color: #111827 !important;
+}
+
+/* Component classes */
+html:not(.dark) .card       { background: #ffffff !important; border-color: #e5e7eb !important; }
+html:not(.dark) .input      { background: #ffffff !important; border-color: #d1d5db !important; color: #111827 !important; }
+html:not(.dark) .input::placeholder { color: #9ca3af !important; }
+html:not(.dark) .label      { color: #6b7280 !important; }
+html:not(.dark) .section-title { color: #111827 !important; }
+html:not(.dark) .btn-outline { border-color: #d1d5db !important; color: #374151 !important; }
+html:not(.dark) .btn-outline:hover { border-color: #f59e0b !important; color: #d97706 !important; }
+html:not(.dark) .table-row  { border-color: #e5e7eb !important; }
+html:not(.dark) .table-row:hover { background-color: #f9fafb !important; }
+
+/* Text utilities */
+html:not(.dark) .text-white          { color: #111827 !important; }
+html:not(.dark) .text-onyx-100       { color: #111827 !important; }
+html:not(.dark) .text-onyx-200       { color: #374151 !important; }
+html:not(.dark) .text-onyx-300       { color: #4b5563 !important; }
+html:not(.dark) .text-onyx-400       { color: #6b7280 !important; }
+html:not(.dark) .text-onyx-500       { color: #9ca3af !important; }
+html:not(.dark) .text-onyx-600       { color: #d1d5db !important; }
+
+/* Background utilities */
+html:not(.dark) .bg-onyx-950         { background-color: #ffffff !important; }
+html:not(.dark) .bg-onyx-900         { background-color: #f9fafb !important; }
+html:not(.dark) .bg-onyx-800         { background-color: #f3f4f6 !important; }
+html:not(.dark) .bg-onyx-700         { background-color: #e5e7eb !important; }
+
+/* Opacity backgrounds */
+html:not(.dark) .bg-onyx-800\/50     { background-color: rgba(243,244,246,0.5) !important; }
+html:not(.dark) .bg-onyx-800\/30     { background-color: rgba(243,244,246,0.3) !important; }
+html:not(.dark) .bg-onyx-800\/20     { background-color: rgba(243,244,246,0.2) !important; }
+html:not(.dark) .bg-onyx-900\/50     { background-color: rgba(249,250,251,0.5) !important; }
+
+/* Border utilities */
+html:not(.dark) .border-onyx-900     { border-color: #f3f4f6 !important; }
+html:not(.dark) .border-onyx-800     { border-color: #e5e7eb !important; }
+html:not(.dark) .border-onyx-700     { border-color: #d1d5db !important; }
+html:not(.dark) .border-onyx-600     { border-color: #9ca3af !important; }
+
+/* Navbar */
+html:not(.dark) nav.sticky {
+  background-color: rgba(255,255,255,0.95) !important;
+  border-color: #e5e7eb !important;
+}
+
+/* Footer */
+html:not(.dark) footer { border-color: #e5e7eb !important; color: #9ca3af !important; }
+
+/* Scrollbar */
+html:not(.dark) ::-webkit-scrollbar-track { background: #f3f4f6; }
+html:not(.dark) ::-webkit-scrollbar-thumb { background: #d1d5db; }
