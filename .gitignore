@@ -106,3 +106,8 @@ dsm_*.ps1
 dsm_*.log
 dsm_*.txt
 cf_service.txt
+
+# Internal documentation — not for public repo
+CLAUDE.md
+CAHIER_DES_CHARGES.md
+BUSINESS_MODEL_AFRIQUE_OUEST.md
