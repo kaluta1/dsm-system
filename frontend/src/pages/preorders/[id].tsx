@@ -3,7 +3,7 @@ import { useRouter } from "next/router"
 import Layout from "@/components/Layout"
 import { useAuth, api, apiError } from "@/lib/api"
 import toast from "react-hot-toast"
-import { ChevronDown, ChevronUp, RefreshCw, Clock, Zap, AlertTriangle } from "lucide-react"
+import { ChevronDown, ChevronUp, RefreshCw, Clock, Zap, AlertTriangle, Lock } from "lucide-react"
 
 interface JournalEntry {
   id: number; event_type: string; account_name: string
@@ -256,6 +256,10 @@ export default function PreorderDetail() {
   const dmeFiat      = po.b15_dme_fiat  ? S * 0.10 : 0
   const supplierFiat = R * (1 - b14)
   const supplierDsp  = Q > 0 ? R / Q * P * b14 : 0
+
+  // Deal is frozen when any condition B8–B13 is active: no recompute of P, T, U, maturity or journal
+  const dealFrozen = po.b8_deal_closed || po.b9_supplier_failed || po.b10_prepaid ||
+                     po.b11_confirmed || po.b12_prepaid_confirmed || po.b13_dsm_failed
 
   const events = ["ORIGINATION","CANCELLATION","CLOSURE","SUPPLIER_FAILED","PREPAYMENT","COMPLETION","PREPAID_COMPLETION","DSM_FAILED"]
 
@@ -519,17 +523,38 @@ export default function PreorderDetail() {
                 {/* Update DSC rate */}
                 <div className="card">
                   <h3 className="text-xs font-mono text-gold-500 uppercase tracking-wider mb-3">Update DSC Rate (H)</h3>
+                  {dealFrozen && (
+                    <div className="mb-3 flex items-start gap-2 px-3 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <Lock size={13} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-blue-300 leading-snug">
+                        Deal <b>frozen</b> — accounting data locked because a condition (B8–B13) is active.
+                        DSC rate changes will not recompute P, T, U, maturity or journal entries.
+                      </p>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <input type="number" step="0.000001" className="input flex-1 text-sm" value={newDscRate}
-                      onChange={e => setNewDscRate(e.target.value)} placeholder={`current: $${fmt(H, 8)}`} />
-                    <button onClick={updateDscRate} disabled={!newDscRate || saving} className="btn-gold px-3 text-sm">OK</button>
+                      onChange={e => setNewDscRate(e.target.value)} placeholder={`current: $${fmt(H, 8)}`}
+                      disabled={dealFrozen} />
+                    <button onClick={updateDscRate} disabled={!newDscRate || saving || dealFrozen} className="btn-gold px-3 text-sm">OK</button>
                   </div>
-                  <p className="text-xs font-mono text-onyx-600 mt-2">Recalculates P, T, maturity and journal</p>
+                  <p className="text-xs font-mono text-onyx-600 mt-2">
+                    {dealFrozen ? "Frozen — values locked" : "Recalculates P, T, maturity and journal"}
+                  </p>
                 </div>
 
                 {/* Conditions B7–B13 */}
                 <div className="card">
                   <h3 className="text-xs font-mono text-gold-500 uppercase tracking-wider mb-3">Conditions (B7–B13)</h3>
+                  {po.maturity_status === "Immature" && (
+                    <div className="mb-3 flex items-start gap-2 px-3 py-2.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                      <AlertTriangle size={13} className="text-yellow-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-yellow-300 leading-snug">
+                        Deal <b>Immature</b> — conditions B7–B13 locked.
+                        Update the DSC rate above to make the deal Mature first.
+                      </p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {[
                       { key: "b7_cancelled",         label: "B7 — Cancellation" },
@@ -544,7 +569,7 @@ export default function PreorderDetail() {
                         description={CONDITION_DESCRIPTIONS[key]}
                         value={(po as any)[key]}
                         onChange={v => updateConditions({ [key]: v })}
-                        disabled={saving} />
+                        disabled={saving || po.maturity_status === "Immature"} />
                     ))}
                   </div>
                 </div>

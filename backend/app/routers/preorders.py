@@ -22,6 +22,8 @@ def _build_preorder_data(po: models.Preorder) -> PreorderData:
         requisite_dsps=Decimal(str(po.requisite_dsps)),
         excess_dsps=Decimal(str(po.excess_dsps)),
         deficiency_dsps=Decimal(str(po.deficiency_dsps)),
+        currency=(po.currency or "USD"),
+        fx_rate_to_usd=Decimal(str(po.fx_rate_to_usd or 1)),
         b7_cancelled=po.b7_cancelled,
         b8_deal_closed=po.b8_deal_closed,
         b9_supplier_failed=po.b9_supplier_failed,
@@ -40,8 +42,10 @@ def _recompute_variable_fields(po: models.Preorder, dsc_rate: Decimal):
     units = po.reserved_units
     supplier_price = Decimal(str(po.supplier_price))
 
+    fx = Decimal(str(po.fx_rate_to_usd or 1))
+    deal_price_usd = deal_price * fx
     current_reservation_rate = tier_pct * dsc_rate
-    dsps_needed_per_unit = deal_price / dsc_rate if dsc_rate > 0 else ZERO
+    dsps_needed_per_unit = deal_price_usd / dsc_rate if dsc_rate > 0 else ZERO
     requisite_dsps = dsps_needed_per_unit * units
     reserved_dsps = Decimal(str(po.reserved_dsps))
     excess_dsps = max(reserved_dsps - requisite_dsps, ZERO)
@@ -120,6 +124,8 @@ def create_preorder(data: schemas.PreorderCreate, db: Session = Depends(get_db),
     deal_price = Decimal(str(product.deal_price))
     supplier_price = Decimal(str(product.supplier_price))
     dsc_rate = Decimal(str(product.dsc_ruling_rate))
+    fx = Decimal(str(product.fx_rate_to_usd or 1))
+    deal_price_usd = deal_price * fx
     tier_pct = Decimal(str(option.tier_pct))
     units = data.reserved_units
 
@@ -127,7 +133,7 @@ def create_preorder(data: schemas.PreorderCreate, db: Session = Depends(get_db),
     reserved_dsps = dsps_per_unit * units
     orig_rate = Decimal(str(option.reservation_rate))
     current_rate = tier_pct * dsc_rate
-    dsps_needed = deal_price / dsc_rate if dsc_rate > 0 else ZERO
+    dsps_needed = deal_price_usd / dsc_rate if dsc_rate > 0 else ZERO
     requisite_dsps = dsps_needed * units
     excess_dsps = max(reserved_dsps - requisite_dsps, ZERO)
     deficiency_dsps = max(requisite_dsps - reserved_dsps, ZERO)
@@ -150,6 +156,8 @@ def create_preorder(data: schemas.PreorderCreate, db: Session = Depends(get_db),
         original_reservation_rate=orig_rate,
         supplier_price=supplier_price,
         deal_price=deal_price,
+        currency=(product.currency or "USD"),
+        fx_rate_to_usd=fx,
         reserved_units=units,
         reserved_dsps_per_unit=dsps_per_unit,
         min_order=product.global_min_order,
@@ -212,25 +220,49 @@ def update_conditions(preorder_id: int, data: schemas.ConditionUpdate,
     if not po:
         raise HTTPException(404, "Précommande introuvable")
 
-    # Met à jour les conditions
-    fields = [
+    # ─── Garde-fou : si le deal est Immature, on bloque les conditions B7-B13
+    # Seuls B14/B15 (config) et new_dsc_rate (qui peut justement rendre mature) restent autorisés.
+    condition_fields = [
         "b7_cancelled","b8_deal_closed","b9_supplier_failed","b10_prepaid",
         "b11_confirmed","b12_prepaid_confirmed","b13_dsm_failed",
-        "b14_supplier_dsp_pct","b15_dme_fiat"
     ]
+    if po.maturity_status == "Immature":
+        attempted = [f for f in condition_fields if getattr(data, f, None) is not None]
+        if attempted:
+            raise HTTPException(
+                400,
+                f"Deal Immature — conditions bloquées ({', '.join(attempted)}). "
+                "Modifie d'abord le taux DSC pour le rendre Mature."
+            )
+
+    # ─── Snapshot de l'état AVANT modification : le gel ne s'applique que
+    # si le deal était DÉJÀ closed avant cette requête.
+    was_already_closed = any([
+        po.b8_deal_closed, po.b9_supplier_failed, po.b10_prepaid,
+        po.b11_confirmed, po.b12_prepaid_confirmed, po.b13_dsm_failed,
+    ])
+
+    # Met à jour les conditions
+    fields = condition_fields + ["b14_supplier_dsp_pct","b15_dme_fiat"]
     for f in fields:
         v = getattr(data, f, None)
         if v is not None:
             setattr(po, f, v)
 
-    # Met à jour le taux DSC si fourni
-    if data.new_dsc_rate is not None:
-        _recompute_variable_fields(po, Decimal(str(data.new_dsc_rate)))
-    else:
-        _recompute_variable_fields(po, Decimal(str(po.dsc_ruling_rate)))
+    # ─── Gel des données : si le deal ÉTAIT DÉJÀ "closed" (B8–B13 actif
+    # AVANT cette requête), on ne recompute NI les champs variables
+    # (P, T, U, maturity) NI les écritures comptables.
+    # Mais si on VIENT de fermer le deal (B8–B13 passé de 0→1), on doit
+    # recalculer pour que le journal reflète les nouvelles conditions.
+    if not was_already_closed:
+        # Met à jour le taux DSC si fourni
+        if data.new_dsc_rate is not None:
+            _recompute_variable_fields(po, Decimal(str(data.new_dsc_rate)))
+        else:
+            _recompute_variable_fields(po, Decimal(str(po.dsc_ruling_rate)))
+        _recompute_journal(db, po)
 
     _update_deal_status(po)
-    _recompute_journal(db, po)
     po.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(po)
