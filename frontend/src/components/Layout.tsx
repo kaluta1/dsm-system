@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { useRouter } from "next/router"
-import { useAuth } from "@/lib/api"
+import { useAuth } from "@/lib/api";
 import { ShoppingBag, LayoutDashboard, Users, LogOut, Wallet, Shield, Sun, Moon, Menu, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
