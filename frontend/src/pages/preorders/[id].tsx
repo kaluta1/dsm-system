@@ -14,6 +14,7 @@ interface Preorder {
   id: number; unique_id: number; reserved_units: number; tier_pct: string
   original_reservation_rate: string; current_reservation_rate: string
   dsc_ruling_rate: string
+  closure_dsc_rate: string | null   // H4 frozen at B8 — used for all post-closure journal calcs
   reserved_dsps: string; reserved_dsps_per_unit: string
   requisite_dsps: string; dsps_needed_per_unit: string
   excess_dsps: string; deficiency_dsps: string; deals_value: string; suppliers_value: string
@@ -257,9 +258,8 @@ export default function PreorderDetail() {
   const supplierFiat = R * (1 - b14)
   const supplierDsp  = Q > 0 ? R / Q * P * b14 : 0
 
-  // Deal is frozen when any condition B8–B13 is active: no recompute of P, T, U, maturity or journal
-  const dealFrozen = po.b8_deal_closed || po.b9_supplier_failed || po.b10_prepaid ||
-                     po.b11_confirmed || po.b12_prepaid_confirmed || po.b13_dsm_failed
+  // Deal is frozen (closure rate captured) when B8 was activated
+  const dealFrozen = !!po.closure_dsc_rate
 
   const events = ["ORIGINATION","CANCELLATION","CLOSURE","SUPPLIER_FAILED","PREPAYMENT","COMPLETION","PREPAID_COMPLETION","DSM_FAILED"]
 
@@ -523,23 +523,29 @@ export default function PreorderDetail() {
                 {/* Update DSC rate */}
                 <div className="card">
                   <h3 className="text-xs font-mono text-gold-500 uppercase tracking-wider mb-3">Update DSC Rate (H)</h3>
-                  {dealFrozen && (
+
+                  {/* Closure rate banner — shown once B8 is active */}
+                  {po.closure_dsc_rate && (
                     <div className="mb-3 flex items-start gap-2 px-3 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                       <Lock size={13} className="text-blue-400 mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-blue-300 leading-snug">
-                        Deal <b>frozen</b> — accounting data locked because a condition (B8–B13) is active.
-                        DSC rate changes will not recompute P, T, U, maturity or journal entries.
+                        <b>Closure rate (H4) frozen at ${fmt(n(po.closure_dsc_rate), 8)}</b> — all journal entries
+                        (B8–B13) use this rate. P, T, U and maturity are locked at closure values.
+                        Changing H below only updates the display rate.
                       </p>
                     </div>
                   )}
+
                   <div className="flex gap-2">
                     <input type="number" step="0.000001" className="input flex-1 text-sm" value={newDscRate}
-                      onChange={e => setNewDscRate(e.target.value)} placeholder={`current: $${fmt(H, 8)}`}
-                      disabled={dealFrozen} />
-                    <button onClick={updateDscRate} disabled={!newDscRate || saving || dealFrozen} className="btn-gold px-3 text-sm">OK</button>
+                      onChange={e => setNewDscRate(e.target.value)}
+                      placeholder={`current: $${fmt(H, 8)}${po.closure_dsc_rate ? ` (closure: $${fmt(n(po.closure_dsc_rate), 8)})` : ""}`} />
+                    <button onClick={updateDscRate} disabled={!newDscRate || saving} className="btn-gold px-3 text-sm">OK</button>
                   </div>
                   <p className="text-xs font-mono text-onyx-600 mt-2">
-                    {dealFrozen ? "Frozen — values locked" : "Recalculates P, T, maturity and journal"}
+                    {po.closure_dsc_rate
+                      ? "P/T/U/maturity frozen — journal uses closure rate"
+                      : "Recalculates P, T, maturity and journal"}
                   </p>
                 </div>
 

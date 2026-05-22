@@ -48,6 +48,8 @@ class ProductCreate(BaseModel):
     deal_price: Decimal
     supplier_min_order: int
     dsc_ruling_rate: Decimal
+    currency: str = "USD"
+    fx_rate_to_usd: Decimal = Decimal("1")
 
 class ProductOut(BaseModel):
     id: int
@@ -56,6 +58,8 @@ class ProductOut(BaseModel):
     image_url: Optional[str]
     supplier_price: Decimal
     deal_price: Decimal
+    currency: str
+    fx_rate_to_usd: Decimal
     supplier_min_order: int
     global_min_order: int
     personal_min_order: int
@@ -64,6 +68,10 @@ class ProductOut(BaseModel):
     reservation_options: List[ReservationOptionOut] = []
     created_at: datetime
     model_config = {"from_attributes": True}
+
+class CurrencyUpdate(BaseModel):
+    currency: str
+    fx_rate_to_usd: Decimal
 
 
 # ── Preorders
@@ -110,6 +118,8 @@ class PreorderOut(BaseModel):
     original_reservation_rate: Decimal
     supplier_price: Decimal
     deal_price: Decimal
+    currency: str
+    fx_rate_to_usd: Decimal
     reserved_units: int
     reserved_dsps_per_unit: Decimal
     min_order: int
@@ -119,6 +129,7 @@ class PreorderOut(BaseModel):
     deals_markup: Decimal
     current_reservation_rate: Decimal
     dsc_ruling_rate: Decimal
+    closure_dsc_rate: Optional[Decimal] = None   # H4 frozen at deal closure (B8)
     dsps_needed_per_unit: Decimal
     requisite_dsps: Decimal
     excess_dsps: Decimal

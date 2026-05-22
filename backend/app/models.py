@@ -23,12 +23,14 @@ class Product(Base):
     name = Column(String, nullable=False)
     description = Column(String)
     image_url = Column(String)
-    supplier_price = Column(Numeric(24, 8), nullable=False)   # wholesale price
-    deal_price = Column(Numeric(24, 8), nullable=False)        # retail + markup
+    supplier_price = Column(Numeric(24, 8), nullable=False)   # wholesale price (in `currency`)
+    deal_price = Column(Numeric(24, 8), nullable=False)        # retail + markup (in `currency`)
+    currency = Column(String, nullable=False, default="USD")   # ISO code: USD, EUR, XOF, NGN, ...
+    fx_rate_to_usd = Column(Numeric(24, 8), nullable=False, default=1)  # 1 unit of currency = N USD
     supplier_min_order = Column(Integer, nullable=False)       # supplier requirement
     global_min_order = Column(Integer, nullable=False)         # 120% of above
     personal_min_order = Column(Integer, default=1)
-    dsc_ruling_rate = Column(Numeric(24, 8), nullable=False)   # current DSC/USD rate
+    dsc_ruling_rate = Column(Numeric(24, 8), nullable=False)   # current DSC/USD rate (always USD)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     reservation_options = relationship("ReservationOption", back_populates="product", cascade="all, delete-orphan")
@@ -63,6 +65,8 @@ class Preorder(Base):
     original_reservation_rate = Column(Numeric(24, 8), nullable=False)
     supplier_price = Column(Numeric(24, 8), nullable=False)
     deal_price = Column(Numeric(24, 8), nullable=False)
+    currency = Column(String, nullable=False, default="USD")             # snapshot from product
+    fx_rate_to_usd = Column(Numeric(24, 8), nullable=False, default=1)   # snapshot from product
     reserved_units = Column(Integer, nullable=False)
     reserved_dsps_per_unit = Column(Numeric(24, 8), nullable=False)
     min_order = Column(Integer, nullable=False)
@@ -73,7 +77,8 @@ class Preorder(Base):
 
     # ── Variable values (update when DSC rate changes)
     current_reservation_rate = Column(Numeric(24, 8), nullable=False)
-    dsc_ruling_rate = Column(Numeric(24, 8), nullable=False)   # H4
+    dsc_ruling_rate = Column(Numeric(24, 8), nullable=False)   # H4 — current rate (may change)
+    closure_dsc_rate = Column(Numeric(24, 8), nullable=True)   # H4 frozen at B8 activation — used for all journal calcs after closure
     dsps_needed_per_unit = Column(Numeric(24, 8), nullable=False)
     requisite_dsps = Column(Numeric(24, 8), nullable=False)    # P = units × dsps_needed_per_unit
     excess_dsps = Column(Numeric(24, 8), nullable=False)       # T = max(O − P, 0)

@@ -13,12 +13,19 @@ router = APIRouter(prefix="/preorders", tags=["Preorders"])
 ZERO = Decimal("0")
 
 def _build_preorder_data(po: models.Preorder) -> PreorderData:
+    # After deal closure (B8), use the frozen closure DSC rate as H4
+    # so all journal calculations (B9, B10, B11…) use the rate at closure time.
+    effective_rate = (
+        Decimal(str(po.closure_dsc_rate))
+        if po.closure_dsc_rate is not None
+        else Decimal(str(po.dsc_ruling_rate))
+    )
     return PreorderData(
         reserved_dsps=Decimal(str(po.reserved_dsps)),
         deals_value=Decimal(str(po.deals_value)),
         suppliers_value=Decimal(str(po.suppliers_value)),
         deals_markup=Decimal(str(po.deals_markup)),
-        dsc_ruling_rate=Decimal(str(po.dsc_ruling_rate)),
+        dsc_ruling_rate=effective_rate,
         requisite_dsps=Decimal(str(po.requisite_dsps)),
         excess_dsps=Decimal(str(po.excess_dsps)),
         deficiency_dsps=Decimal(str(po.deficiency_dsps)),
@@ -235,8 +242,7 @@ def update_conditions(preorder_id: int, data: schemas.ConditionUpdate,
                 "Modifie d'abord le taux DSC pour le rendre Mature."
             )
 
-    # ─── Snapshot de l'état AVANT modification : le gel ne s'applique que
-    # si le deal était DÉJÀ closed avant cette requête.
+    # ─── Snapshot AVANT modification : savoir si le deal était déjà closed
     was_already_closed = any([
         po.b8_deal_closed, po.b9_supplier_failed, po.b10_prepaid,
         po.b11_confirmed, po.b12_prepaid_confirmed, po.b13_dsm_failed,
@@ -249,18 +255,32 @@ def update_conditions(preorder_id: int, data: schemas.ConditionUpdate,
         if v is not None:
             setattr(po, f, v)
 
-    # ─── Gel des données : si le deal ÉTAIT DÉJÀ "closed" (B8–B13 actif
-    # AVANT cette requête), on ne recompute NI les champs variables
-    # (P, T, U, maturity) NI les écritures comptables.
-    # Mais si on VIENT de fermer le deal (B8–B13 passé de 0→1), on doit
-    # recalculer pour que le journal reflète les nouvelles conditions.
-    if not was_already_closed:
-        # Met à jour le taux DSC si fourni
+    # ─── Snapshot du DSC rate à la clôture (B8 vient de passer 0→1)
+    # Ce taux est figé et servira de H4 pour tous les calculs comptables
+    # ultérieurs (B9, B10, B11, B12, B13).
+    if not was_already_closed and po.b8_deal_closed and po.closure_dsc_rate is None:
+        # Appliquer d'abord le nouveau taux si fourni, puis freezer
+        if data.new_dsc_rate is not None:
+            _recompute_variable_fields(po, Decimal(str(data.new_dsc_rate)))
+        po.closure_dsc_rate = po.dsc_ruling_rate   # <── freeze H4 at closure
+
+    # ─── Gel des champs variables (P, T, U, maturity) après clôture
+    # Les valeurs de P, T, U reflètent le moment de clôture et ne bougent plus.
+    # Le DSC rate courant peut changer mais n'affecte pas la comptabilité.
+    if not was_already_closed and not po.b8_deal_closed:
+        # Deal pas encore closed : mise à jour normale des champs variables
         if data.new_dsc_rate is not None:
             _recompute_variable_fields(po, Decimal(str(data.new_dsc_rate)))
         else:
             _recompute_variable_fields(po, Decimal(str(po.dsc_ruling_rate)))
-        _recompute_journal(db, po)
+    elif was_already_closed and data.new_dsc_rate is not None:
+        # Deal déjà closed : on met à jour dsc_ruling_rate pour affichage
+        # mais P/T/U/maturity restent gelés (pas de _recompute_variable_fields)
+        po.dsc_ruling_rate = Decimal(str(data.new_dsc_rate))
+
+    # Le journal se régénère TOUJOURS — il utilise closure_dsc_rate via
+    # _build_preorder_data() si défini, garantissant la cohérence comptable.
+    _recompute_journal(db, po)
 
     _update_deal_status(po)
     po.updated_at = datetime.utcnow()
