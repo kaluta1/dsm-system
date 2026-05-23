@@ -120,6 +120,16 @@ function ConditionSwitch({ label, description, value, onChange, disabled = false
   )
 }
 
+// Currency badge — DSP = blue, USD = green, other fiat = gold
+function CurrencyBadge({ cur }: { cur: string }) {
+  const style = cur === "DSP"
+    ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+    : cur === "USD"
+      ? "bg-green-500/10 text-green-400 border-green-500/20"
+      : "bg-gold-500/10 text-gold-400 border-gold-500/20"
+  return <span className={`badge border ${style}`}>{cur}</span>
+}
+
 function JournalBlock({ entries, event }: { entries: JournalEntry[]; event: string }) {
   const [open, setOpen] = useState(false)
   const filtered = entries.filter(e => e.event_type === event)
@@ -165,11 +175,7 @@ function JournalBlock({ entries, event }: { entries: JournalEntry[]; event: stri
                   <td className="px-4 py-2 text-onyx-300 max-w-xs truncate">{e.account_name}</td>
                   <td className="px-4 py-2 text-onyx-500">{e.account_type}</td>
                   <td className="px-4 py-2">
-                    <span className={`badge ${e.currency === "DSP"
-                      ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                      : "bg-green-500/10 text-green-400 border-green-500/20"}`}>
-                      {e.currency}
-                    </span>
+                    <CurrencyBadge cur={e.currency || "DSP"} />
                   </td>
                   <td className="px-4 py-2 text-right text-onyx-200">{n(e.debit)  > 0 ? fmt(e.debit,  6) : "—"}</td>
                   <td className="px-4 py-2 text-right text-onyx-200">{n(e.credit) > 0 ? fmt(e.credit, 6) : "—"}</td>
@@ -248,6 +254,15 @@ export default function PreorderDetail() {
   const H    = n(po.dsc_ruling_rate)
   const b14  = n(po.b14_supplier_dsp_pct)
 
+  // ── Multi-currency helpers
+  const FIAT    = po.currency || "USD"
+  const FX      = n(po.fx_rate_to_usd || "1")          // 1 FIAT = FX USD
+  const isUSD   = FIAT === "USD"
+  // DSC rate expressed in local fiat: 1 DSP = H USD = H/FX FIAT
+  const H_fiat  = FX > 0 ? H / FX : 0
+  const H_cl    = po.closure_dsc_rate ? n(po.closure_dsc_rate) : null
+  const H_cl_fiat = (H_cl && FX > 0) ? H_cl / FX : null
+
   const ratio        = Q > 0 ? P / Q : 0
   const dsmRevenue   = S * ratio * 0.30
   const endorsement  = S * ratio * 0.20
@@ -320,9 +335,9 @@ export default function PreorderDetail() {
                   { code: "P", label: "Requisite DSPs (variable)", value: `${fmt(P, 6)} DSP`, hi: true  },
                   { code: "T", label: "Excess DSPs",               value: `${fmt(T, 6)} DSP`, hi: T > 0 },
                   { code: "U", label: "Deficiency DSPs",           value: `${fmt(U, 6)} DSP`, hi: false, warn: U > 0 },
-                  { code: "Q", label: "Deal value",                value: `$${fmt(Q, 2)}`,    hi: false },
-                  { code: "R", label: "Supplier value",            value: `$${fmt(R, 2)}`,    hi: false },
-                  { code: "S", label: "Markup (Q − R)",            value: `$${fmt(S, 2)}`,    hi: true, warn: S <= 0 },
+                  { code: "Q", label: `Deal value (${FIAT})`,     value: `${FIAT} ${fmt(Q, 2)}`, hi: false },
+                  { code: "R", label: `Supplier value (${FIAT})`, value: `${FIAT} ${fmt(R, 2)}`, hi: false },
+                  { code: "S", label: `Markup Q−R (${FIAT})`,     value: `${FIAT} ${fmt(S, 2)}`, hi: true, warn: S <= 0 },
                 ].map(v => (
                   <div key={v.code}
                     className={`rounded-lg p-3 border transition-colors
@@ -351,7 +366,7 @@ export default function PreorderDetail() {
               <div className="px-4 py-3 border-b border-onyx-800">
                 <h3 className="font-display text-sm font-semibold text-white">
                   Markup Distribution (S)
-                  <span className="ml-2 text-xs font-mono font-normal text-onyx-500">= ${fmt(S, 2)}</span>
+                  <span className="ml-2 text-xs font-mono font-normal text-onyx-500">= {FIAT} {fmt(S, 2)}</span>
                 </h3>
               </div>
               <div className="overflow-x-auto">
@@ -372,7 +387,7 @@ export default function PreorderDetail() {
                       { dest: "DME commission", pct: "10%",
                         formula: po.b15_dme_fiat ? "S×10%" : "S/Q×P×10%",
                         val: po.b15_dme_fiat ? dmeFiat : dmeDsp,
-                        cur: po.b15_dme_fiat ? "USD" : "DSP" },
+                        cur: po.b15_dme_fiat ? FIAT : "DSP" },
                     ].map(row => (
                       <tr key={row.dest} className="border-t border-onyx-800/60 hover:bg-onyx-800/20">
                         <td className="px-3 py-2.5 text-onyx-200">{row.dest}</td>
@@ -380,11 +395,7 @@ export default function PreorderDetail() {
                         <td className="px-3 py-2.5 italic text-onyx-500">{row.formula}</td>
                         <td className="px-3 py-2.5 text-right text-white font-semibold">{fmt(row.val, 6)}</td>
                         <td className="px-3 py-2.5">
-                          <span className={`badge ${row.cur === "DSP"
-                            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                            : "bg-green-500/10 text-green-400 border-green-500/20"}`}>
-                            {row.cur}
-                          </span>
+                          <CurrencyBadge cur={row.cur} />
                         </td>
                       </tr>
                     ))}
@@ -394,8 +405,8 @@ export default function PreorderDetail() {
                       </td>
                     </tr>
                     {[
-                      { dest: "Supplier (USD)", pct: `${((1-b14)*100).toFixed(0)}% of R`, formula: "R×(1−B14)", val: supplierFiat, cur: "USD" },
-                      { dest: "Supplier (DSP)", pct: `${(b14*100).toFixed(0)}% of R`,     formula: "R/Q×P×B14", val: supplierDsp,  cur: "DSP" },
+                      { dest: `Supplier (${FIAT})`, pct: `${((1-b14)*100).toFixed(0)}% of R`, formula: "R×(1−B14)", val: supplierFiat, cur: FIAT },
+                      { dest: "Supplier (DSP)",    pct: `${(b14*100).toFixed(0)}% of R`,     formula: "R/Q×P×B14", val: supplierDsp,  cur: "DSP" },
                     ].map(row => (
                       <tr key={row.dest} className="border-t border-onyx-800/60 hover:bg-onyx-800/20">
                         <td className="px-3 py-2.5 text-onyx-200">{row.dest}</td>
@@ -403,11 +414,7 @@ export default function PreorderDetail() {
                         <td className="px-3 py-2.5 italic text-onyx-500">{row.formula}</td>
                         <td className="px-3 py-2.5 text-right text-white font-semibold">{fmt(row.val, 6)}</td>
                         <td className="px-3 py-2.5">
-                          <span className={`badge ${row.cur === "DSP"
-                            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                            : "bg-green-500/10 text-green-400 border-green-500/20"}`}>
-                            {row.cur}
-                          </span>
+                          <CurrencyBadge cur={row.cur} />
                         </td>
                       </tr>
                     ))}
@@ -440,7 +447,7 @@ export default function PreorderDetail() {
                       { cond: "B12", label: "When the preorderer confirms the receipt of the prepaid deal",     scope: "PREORDER", val: po.b12_prepaid_confirmed, type: "bool" },
                       { cond: "B13", label: "When DSM fails to judge the dispute",              scope: "PREORDER", val: po.b13_dsm_failed,        type: "bool" },
                       { cond: "B14", label: "Percentage of Supplier's payment in DSPs",          scope: "PRODUCT",  val: `${(b14 * 100).toFixed(0)}%`, type: "text" },
-                      { cond: "B15", label: "DME payment option (0=DSP, 1=Fiat)",  scope: "PRODUCT",  val: po.b15_dme_fiat ? "1 — Fiat USD" : "0 — DSPs", type: "text" },
+                      { cond: "B15", label: "DME payment option (0=DSP, 1=Fiat)",  scope: "PRODUCT",  val: po.b15_dme_fiat ? `1 — Fiat (${FIAT})` : "0 — DSPs", type: "text" },
                     ].map(row => (
                       <tr key={row.cond} className="border-t border-onyx-800/60 hover:bg-onyx-800/20">
                         <td className="px-3 py-2.5 text-gold-400 font-bold whitespace-nowrap">{row.cond}</td>
@@ -496,18 +503,24 @@ export default function PreorderDetail() {
               <h3 className="text-xs font-mono text-onyx-400 uppercase tracking-wider mb-3">Summary</h3>
               <div className="space-y-2.5">
                 {[
-                  { label: "Units",        val: `${po.reserved_units} u.` },
-                  { label: "Tier",         val: `${tierLabel(po.tier_pct)} of rate` },
-                  { label: "H (DSC rate)", val: `$${fmt(H, 8)}` },
-                  { label: "H₀ (original)",val: `$${fmt(n(po.original_reservation_rate), 8)}` },
-                  { label: "Min. order",   val: `${po.min_order} u.` },
-                  { label: "O (reserved)", val: `${fmt(O, 6)} DSP` },
-                  { label: "P (requisite)",val: `${fmt(P, 6)} DSP` },
-                  { label: "T (excess)",   val: T > 0 ? `${fmt(T, 6)} DSP` : "0 DSP",
+                  { label: "Units",          val: `${po.reserved_units} u.` },
+                  { label: "Tier",           val: `${tierLabel(po.tier_pct)} of rate` },
+                  { label: "Currency",       val: FIAT,
+                    color: isUSD ? "text-white" : "text-gold-400" },
+                  { label: "FX rate",        val: isUSD ? "1 USD = 1 USD" : `1 ${FIAT} = $${fmt(FX, 6)} USD`,
+                    color: "text-onyx-400" },
+                  { label: "H (DSC · USD)",  val: `$${fmt(H, 6)} / DSP` },
+                  { label: `H (DSC · ${FIAT})`, val: `${FIAT} ${fmt(H_fiat, 2)} / DSP`,
+                    color: isUSD ? "text-onyx-600" : "text-gold-300" },
+                  { label: "H₀ (original)",  val: `$${fmt(n(po.original_reservation_rate), 6)}` },
+                  { label: "Min. order",     val: `${po.min_order} u.` },
+                  { label: "O (reserved)",   val: `${fmt(O, 6)} DSP` },
+                  { label: "P (requisite)",  val: `${fmt(P, 6)} DSP` },
+                  { label: "T (excess)",     val: T > 0 ? `${fmt(T, 6)} DSP` : "0 DSP",
                     color: T > 0 ? "text-green-400" : "text-onyx-500" },
                   { label: "U (deficiency)", val: U > 0 ? `${fmt(U, 6)} DSP` : "0 DSP",
                     color: U > 0 ? "text-red-400" : "text-onyx-500" },
-                  { label: "S (markup)",   val: `$${fmt(S, 2)}`,
+                  { label: `S (markup · ${FIAT})`, val: `${FIAT} ${fmt(S, 2)}`,
                     color: S > 0 ? "text-gold-400" : "text-orange-400" },
                 ].map(({ label, val, color }) => (
                   <div key={label} className="flex justify-between items-center">
@@ -525,13 +538,16 @@ export default function PreorderDetail() {
                   <h3 className="text-xs font-mono text-gold-500 uppercase tracking-wider mb-3">Update DSC Rate (H)</h3>
 
                   {/* Closure rate banner — shown once B8 is active */}
-                  {po.closure_dsc_rate && (
+                  {H_cl && (
                     <div className="mb-3 flex items-start gap-2 px-3 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                       <Lock size={13} className="text-blue-400 mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-blue-300 leading-snug">
-                        <b>Closure rate (H4) frozen at ${fmt(n(po.closure_dsc_rate), 8)}</b> — all journal entries
-                        (B8–B13) use this rate. P, T, U and maturity are locked at closure values.
-                        Changing H below only updates the display rate.
+                        <b>Closure rate frozen</b> — journal uses this rate for all entries (B8–B13).<br/>
+                        <span className="font-mono">$&nbsp;{fmt(H_cl, 8)} USD / DSP</span>
+                        {!isUSD && H_cl_fiat && (
+                          <span className="ml-2 text-blue-200 font-mono">= {FIAT} {fmt(H_cl_fiat, 2)} / DSP</span>
+                        )}
+                        <span className="block mt-0.5 text-blue-400/70">P, T, U and maturity locked at closure values.</span>
                       </p>
                     </div>
                   )}
@@ -539,13 +555,13 @@ export default function PreorderDetail() {
                   <div className="flex gap-2">
                     <input type="number" step="0.000001" className="input flex-1 text-sm" value={newDscRate}
                       onChange={e => setNewDscRate(e.target.value)}
-                      placeholder={`current: $${fmt(H, 8)}${po.closure_dsc_rate ? ` (closure: $${fmt(n(po.closure_dsc_rate), 8)})` : ""}`} />
+                      placeholder={`$${fmt(H, 6)} USD${!isUSD ? ` ≈ ${FIAT} ${fmt(H_fiat, 2)}` : ""}${H_cl ? " (frozen)" : ""}`} />
                     <button onClick={updateDscRate} disabled={!newDscRate || saving} className="btn-gold px-3 text-sm">OK</button>
                   </div>
                   <p className="text-xs font-mono text-onyx-600 mt-2">
-                    {po.closure_dsc_rate
+                    {H_cl
                       ? "P/T/U/maturity frozen — journal uses closure rate"
-                      : "Recalculates P, T, maturity and journal"}
+                      : `Recalculates P, T, maturity and journal${!isUSD ? ` · 1 DSP = ${FIAT} ${fmt(H_fiat, 2)}` : ""}`}
                   </p>
                 </div>
 
