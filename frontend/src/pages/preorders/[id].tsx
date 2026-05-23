@@ -556,26 +556,34 @@ export default function PreorderDetail() {
                     <div className="mb-3 flex items-start gap-2 px-3 py-2.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                       <AlertTriangle size={13} className="text-yellow-400 mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-yellow-300 leading-snug">
-                        Deal <b>Immature</b> — conditions B7–B13 locked.
-                        Update the DSC rate above to make the deal Mature first.
+                        Deal <b>Immature</b> — B8–B13 locked. Update the DSC rate to make it Mature first.
+                        <span className="block mt-0.5 text-yellow-400/80">B7 (Cancellation) is still allowed even when Immature.</span>
+                      </p>
+                    </div>
+                  )}
+                  {dealFrozen && (
+                    <div className="mb-3 flex items-start gap-2 px-3 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                      <Lock size={13} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-orange-300 leading-snug">
+                        Deal <b>closed</b> — B7 (Cancellation) is no longer allowed.
                       </p>
                     </div>
                   )}
                   <div className="space-y-2">
                     {[
-                      { key: "b7_cancelled",         label: "B7 — Cancellation" },
-                      { key: "b8_deal_closed",        label: "B8 — Deal Closed" },
-                      { key: "b9_supplier_failed",    label: "B9 — Supplier KO" },
-                      { key: "b10_prepaid",           label: "B10 — Prepayment" },
-                      { key: "b11_confirmed",         label: "B11 — Confirmed" },
-                      { key: "b12_prepaid_confirmed", label: "B12 — Prepaid Confirmed" },
-                      { key: "b13_dsm_failed",        label: "B13 — DSM Failed" },
-                    ].map(({ key, label }) => (
+                      { key: "b7_cancelled",         label: "B7 — Cancellation",      lockedWhen: dealFrozen },
+                      { key: "b8_deal_closed",        label: "B8 — Deal Closed",       lockedWhen: po.maturity_status === "Immature" },
+                      { key: "b9_supplier_failed",    label: "B9 — Supplier KO",       lockedWhen: po.maturity_status === "Immature" },
+                      { key: "b10_prepaid",           label: "B10 — Prepayment",       lockedWhen: po.maturity_status === "Immature" },
+                      { key: "b11_confirmed",         label: "B11 — Confirmed",        lockedWhen: po.maturity_status === "Immature" },
+                      { key: "b12_prepaid_confirmed", label: "B12 — Prepaid Confirmed",lockedWhen: po.maturity_status === "Immature" },
+                      { key: "b13_dsm_failed",        label: "B13 — DSM Failed",       lockedWhen: po.maturity_status === "Immature" },
+                    ].map(({ key, label, lockedWhen }) => (
                       <ConditionSwitch key={key} label={label}
                         description={CONDITION_DESCRIPTIONS[key]}
                         value={(po as any)[key]}
                         onChange={v => updateConditions({ [key]: v })}
-                        disabled={saving || po.maturity_status === "Immature"} />
+                        disabled={saving || lockedWhen} />
                     ))}
                   </div>
                 </div>

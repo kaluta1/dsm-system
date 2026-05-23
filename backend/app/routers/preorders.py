@@ -227,14 +227,26 @@ def update_conditions(preorder_id: int, data: schemas.ConditionUpdate,
     if not po:
         raise HTTPException(404, "Précommande introuvable")
 
-    # ─── Garde-fou : si le deal est Immature, on bloque les conditions B7-B13
-    # Seuls B14/B15 (config) et new_dsc_rate (qui peut justement rendre mature) restent autorisés.
     condition_fields = [
         "b7_cancelled","b8_deal_closed","b9_supplier_failed","b10_prepaid",
         "b11_confirmed","b12_prepaid_confirmed","b13_dsm_failed",
     ]
+
+    # ─── Snapshot AVANT modification : savoir si le deal était déjà closed
+    was_already_closed = any([
+        po.b8_deal_closed, po.b9_supplier_failed, po.b10_prepaid,
+        po.b11_confirmed, po.b12_prepaid_confirmed, po.b13_dsm_failed,
+    ])
+
+    # ─── Garde-fou 1 : si le deal est Immature, on bloque B8-B13 uniquement.
+    # B7 (annulation) reste autorisé même si Immature.
+    # B14/B15 et new_dsc_rate sont toujours autorisés.
+    immature_blocked = [
+        "b8_deal_closed","b9_supplier_failed","b10_prepaid",
+        "b11_confirmed","b12_prepaid_confirmed","b13_dsm_failed",
+    ]
     if po.maturity_status == "Immature":
-        attempted = [f for f in condition_fields if getattr(data, f, None) is not None]
+        attempted = [f for f in immature_blocked if getattr(data, f, None) is not None]
         if attempted:
             raise HTTPException(
                 400,
@@ -242,11 +254,13 @@ def update_conditions(preorder_id: int, data: schemas.ConditionUpdate,
                 "Modifie d'abord le taux DSC pour le rendre Mature."
             )
 
-    # ─── Snapshot AVANT modification : savoir si le deal était déjà closed
-    was_already_closed = any([
-        po.b8_deal_closed, po.b9_supplier_failed, po.b10_prepaid,
-        po.b11_confirmed, po.b12_prepaid_confirmed, po.b13_dsm_failed,
-    ])
+    # ─── Garde-fou 2 : si le deal est déjà closed (B8-B13), on ne peut plus annuler (B7).
+    # On ne peut pas revenir en arrière une fois le deal fermé.
+    if was_already_closed and getattr(data, "b7_cancelled", None) is not None:
+        raise HTTPException(
+            400,
+            "Impossible d'annuler (B7) un deal déjà closed (B8–B13 actif)."
+        )
 
     # Met à jour les conditions
     fields = condition_fields + ["b14_supplier_dsp_pct","b15_dme_fiat"]
